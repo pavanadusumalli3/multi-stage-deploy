@@ -1,0 +1,38 @@
+name: Deploy Multi-Stage
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_env:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options: [DEV, STAGING, PROD]
+
+jobs:
+  pre_check:
+    name: 'Primary Approval Gate'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.deploy_env == 'DEV' && 'DEV' || 'CONTROLLED' }}
+    steps:
+      - name: Prepare
+        run: echo "approved"
+
+  auto_approve:
+    needs: pre_check
+    runs-on: ubuntu-latest
+    if: inputs.deploy_env != 'DEV'
+    steps:
+      - uses: paulsony13/auto-approve-environment-deployment@v1
+        with:
+          environment: CONTROLLED
+          repo_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: [pre_check, auto_approve]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.deploy_env }}
+    steps:
+      - name: Checkout & Deploy
+        run: |
+          echo "Deploying to ${{ inputs.deploy_env }}"
